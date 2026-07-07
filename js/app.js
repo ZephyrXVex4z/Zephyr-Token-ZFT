@@ -14,6 +14,10 @@ import {
   collection, query, where, getDocs, addDoc, serverTimestamp,
   runTransaction, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Nota: la comprobación de nombre de usuario único durante el registro se
+// hace contra la colección "usernames" (ver firestore.rules), no contra
+// "users", porque antes de iniciar sesión el cliente aún no está
+// autenticado y no puede leer la colección "users".
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -85,18 +89,27 @@ $("registerForm").addEventListener("submit", async (e) => {
   const email = $("registerEmail").value.trim();
   const password = $("registerPassword").value;
 
+  const usernameLower = username.toLowerCase();
+
   try {
-    // nombre de usuario único
-    const existing = await getDocs(query(collection(db, "users"), where("usernameLower", "==", username.toLowerCase())));
-    if (!existing.empty) {
+    // nombre de usuario único (colección ligera, legible sin autenticar)
+    const usernameSnap = await getDoc(doc(db, "usernames", usernameLower));
+    if (usernameSnap.exists()) {
       $("registerError").textContent = "Ese nombre de usuario ya está en uso.";
       return;
     }
 
     const cred = await createUserWithEmailAndPassword(auth, email, password);
+
+    // Reserva el nombre de usuario (si esto falla, seguimos igual: el
+    // registro ya se hizo y el usuario puede entrar con su correo).
+    try {
+      await setDoc(doc(db, "usernames", usernameLower), { uid: cred.user.uid });
+    } catch (_) { /* no bloquea el registro */ }
+
     await setDoc(doc(db, "users", cred.user.uid), {
       username,
-      usernameLower: username.toLowerCase(),
+      usernameLower,
       email,
       balance: 100, // regalo de bienvenida ficticio
       isAdmin: false,
@@ -477,4 +490,3 @@ renderAdminMethodList();
 
 // Cargar usuarios del panel admin al entrar a esa vista
 document.querySelector('.nav-btn[data-view="admin"]')?.addEventListener("click", loadAdminUsers);
-    
