@@ -3,7 +3,7 @@
 // Simulador educativo. Zephyr Token (ZFT) no tiene valor real.
 // ============================================================
 
-import { firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js?v=2";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -486,4 +486,4 @@ $("adminGrantForm").addEventListener("submit", async (e) => {
   const username = $("grantUsername").value.trim();
   const amount = parseInt($("grantAmount").value, 10);
 
-  if (!currentProfile?.isAdmin) { $("adminGrantError").textContent = 
+  if (!currentProfile?.isAdmin) { $("adminGrantError").textConten
