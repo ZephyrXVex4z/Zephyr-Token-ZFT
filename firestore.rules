@@ -1,18 +1,5 @@
 rules_version = '2';
 
-// ============================================================
-// REGLAS DE SEGURIDAD — Zephyr Token (simulador)
-// ============================================================
-// Pega este contenido en: Firebase Console > Firestore Database > Reglas
-//
-// Idea general:
-// - Cualquier usuario autenticado puede leer su propio documento y el de otros
-//   (para poder transferir/consultar), pero SOLO puede escribir en el suyo,
-//   salvo que su propio documento tenga isAdmin == true.
-// - El campo isAdmin NUNCA se puede fijar desde el cliente: solo tú puedes
-//   activarlo manualmente desde la consola de Firebase (Firestore > users/{tuUID}).
-// ============================================================
-
 function isSignedIn() {
   return request.auth != null;
 }
@@ -25,10 +12,6 @@ function isAdmin() {
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Colección ligera solo para comprobar si un nombre de usuario ya
-    // existe DURANTE el registro (antes de haber iniciado sesión).
-    // El documento solo guarda el uid del dueño, nada sensible, así que
-    // es seguro dejarlo legible por cualquiera.
     match /usernames/{usernameLower} {
       allow get: if true;
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
@@ -38,15 +21,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
 
-      // Un usuario puede crear su propio documento al registrarse,
-      // pero nunca puede crearse a sí mismo como admin.
       allow create: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.isAdmin == false;
 
-      // Un usuario puede actualizar su propio documento, PERO nunca
-      // puede cambiar su propio campo isAdmin. Un admin sí puede
-      // modificar el documento de cualquiera (para otorgar saldo).
       allow update: if isSignedIn() && (
         (request.auth.uid == userId &&
           request.resource.data.isAdmin == resource.data.isAdmin)
