@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
 
@@ -88,7 +88,7 @@
           <input type="password" id="registerPassword" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres">
         </label>
         <div class="g-recaptcha-wrap">
-          <div class="g-recaptcha" data-sitekey="6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp" data-callback="onRecaptchaRegister"></div>
+          <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY" data-callback="onRecaptchaRegister"></div>
         </div>
         <p class="form-error" id="registerError" role="alert"></p>
         <button type="submit" class="btn btn-primary btn-block" id="registerSubmitBtn" disabled>Crear cuenta</button>
@@ -266,7 +266,7 @@
       </div>
 
       <div class="g-recaptcha-wrap">
-        <div class="g-recaptcha" data-sitekey="6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp" data-callback="onRecaptchaBuy"></div>
+        <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY" data-callback="onRecaptchaBuy"></div>
       </div>
 
       <p class="form-error" id="buyError" role="alert"></p>
@@ -288,7 +288,7 @@
     <input type="number" id="transferAmount" min="1" step="1">
 
     <div class="g-recaptcha-wrap">
-      <div class="g-recaptcha" data-sitekey="6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp" data-callback="onRecaptchaTransfer"></div>
+      <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY" data-callback="onRecaptchaTransfer"></div>
     </div>
 
     <p class="form-error" id="transferError" role="alert"></p>
@@ -300,8 +300,7 @@
 <!-- ======================= SCRIPTS ======================= -->
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
-<script type="module" src="js/firebase-config.js"></script>
-<script type="module" src="js/app.js"></script>
+<script type="module" src="js/firebase-config.js?v=2"></script>
+<script type="module" src="js/app.js?v=2"></script>
 </body>
 </html>
-
