@@ -24,6 +24,51 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // ------------------------------------------------------------
+// PANEL DE DIAGNÓSTICO (temporal) — se crea por JS, no toca index.html.
+// Muestra en pantalla lo que normalmente solo se ve en la consola del
+// navegador, para poder depurar desde el móvil sin herramientas extra.
+// ------------------------------------------------------------
+const debugPanel = document.createElement("div");
+debugPanel.id = "zephyrDebugPanel";
+debugPanel.style.cssText = `
+  position: fixed; bottom: 0; left: 0; right: 0; max-height: 40vh;
+  overflow-y: auto; background: rgba(0,0,0,0.92); color: #7CFFB2;
+  font-family: monospace; font-size: 11px; line-height: 1.5;
+  padding: 8px 10px; z-index: 99999; border-top: 2px solid #3FBFB0;
+  white-space: pre-wrap; word-break: break-word;
+`;
+const debugHeader = document.createElement("div");
+debugHeader.style.cssText = "display:flex; justify-content:space-between; align-items:center; color:#F2A65A; font-weight:bold; margin-bottom:4px;";
+debugHeader.innerHTML = `<span>🔧 Diagnóstico Zephyr (toca ✕ para ocultar)</span>`;
+const closeDebugBtn = document.createElement("button");
+closeDebugBtn.textContent = "✕";
+closeDebugBtn.style.cssText = "color:#F2A65A; background:none; border:1px solid #F2A65A; border-radius:4px; padding:2px 8px;";
+closeDebugBtn.onclick = () => debugPanel.remove();
+debugHeader.appendChild(closeDebugBtn);
+const debugLogEl = document.createElement("div");
+debugPanel.appendChild(debugHeader);
+debugPanel.appendChild(debugLogEl);
+document.body.appendChild(debugPanel);
+
+function debugLog(msg, isError = false) {
+  const line = document.createElement("div");
+  const time = new Date().toLocaleTimeString("es-ES");
+  line.textContent = `[${time}] ${msg}`;
+  if (isError) line.style.color = "#F17389";
+  debugLogEl.appendChild(line);
+  debugLogEl.scrollTop = debugLogEl.scrollHeight;
+}
+
+window.addEventListener("error", (e) => {
+  debugLog(`ERROR JS: ${e.message} (${e.filename}:${e.lineno})`, true);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  debugLog(`ERROR PROMESA: ${e.reason?.message || e.reason}`, true);
+});
+
+debugLog("Script app.js cargado correctamente.");
+
+// ------------------------------------------------------------
 // Estado local
 // ------------------------------------------------------------
 let currentUser = null;   // Firebase auth user
@@ -163,18 +208,30 @@ onAuthStateChanged(auth, async (user) => {
 
   if (!user) {
     currentProfile = null;
+    debugLog("Sin sesión iniciada.");
     showAuthScreen();
     return;
   }
 
+  debugLog(`Sesión iniciada. UID=${user.uid} email=${user.email}`);
   showAppShell();
 
   // Suscripción en tiempo real al documento del usuario (saldo, admin, etc.)
-  unsubUserDoc = onSnapshot(doc(db, "users", user.uid), (snap) => {
-    if (!snap.exists()) return;
-    currentProfile = snap.data();
-    renderProfile();
-  });
+  unsubUserDoc = onSnapshot(
+    doc(db, "users", user.uid),
+    (snap) => {
+      if (!snap.exists()) {
+        debugLog(`El documento users/${user.uid} NO EXISTE en Firestore.`, true);
+        return;
+      }
+      currentProfile = snap.data();
+      debugLog(`Documento users/${user.uid} leído OK → balance=${currentProfile.balance}, isAdmin=${currentProfile.isAdmin} (tipo: ${typeof currentProfile.isAdmin})`);
+      renderProfile();
+    },
+    (err) => {
+      debugLog(`ERROR leyendo users/${user.uid}: ${err.code} — ${err.message}`, true);
+    }
+  );
 
   // Suscripción en tiempo real al historial
   const txQuery = query(
@@ -182,7 +239,11 @@ onAuthStateChanged(auth, async (user) => {
     orderBy("createdAt", "desc"),
     limit(25)
   );
-  unsubTx = onSnapshot(txQuery, (snap) => renderLedger(snap.docs.map(d => d.data())));
+  unsubTx = onSnapshot(
+    txQuery,
+    (snap) => renderLedger(snap.docs.map(d => d.data())),
+    (err) => debugLog(`ERROR leyendo transactions: ${err.code} — ${err.message}`, true)
+  );
 });
 
 function renderProfile() {
@@ -425,68 +486,4 @@ $("adminGrantForm").addEventListener("submit", async (e) => {
   const username = $("grantUsername").value.trim();
   const amount = parseInt($("grantAmount").value, 10);
 
-  if (!currentProfile?.isAdmin) { $("adminGrantError").textContent = "No tienes permisos de administrador."; return; }
-  if (!username || !amount) { $("adminGrantError").textContent = "Completa usuario y cantidad."; return; }
-
-  try {
-    const q = query(collection(db, "users"), where("usernameLower", "==", username.toLowerCase()));
-    const results = await getDocs(q);
-    if (results.empty) { $("adminGrantError").textContent = "No existe ese usuario."; return; }
-    const targetDoc = results.docs[0];
-    const targetRef = doc(db, "users", targetDoc.id);
-
-    await runTransaction(db, async (t) => {
-      const snap = await t.get(targetRef);
-      t.update(targetRef, { balance: (snap.data().balance || 0) + amount });
-    });
-    await addDoc(collection(db, "users", targetDoc.id, "transactions"), {
-      type: "admin_grant", amount, note: `Otorgado por ${currentProfile.username}`, createdAt: serverTimestamp()
-    });
-
-    $("adminGrantSuccess").textContent = `Otorgaste ${fmt(amount)} ZFT a ${targetDoc.data().username}.`;
-    $("grantUsername").value = "";
-    $("grantAmount").value = "";
-    loadAdminUsers();
-  } catch (err) {
-    $("adminGrantError").textContent = "No se pudo otorgar el saldo.";
-  }
-});
-
-async function loadAdminUsers() {
-  if (!currentProfile?.isAdmin) return;
-  const snap = await getDocs(collection(db, "users"));
-  const rows = snap.docs.map(d => d.data());
-  $("adminUserTable").innerHTML = rows.map(u => `
-    <div class="user-row">
-      <span class="u-name">${u.username}${u.isAdmin ? '<span class="u-admin-badge">admin</span>' : ""}</span>
-      <span class="u-balance">${fmt(u.balance)} ZFT</span>
-    </div>
-  `).join("");
-}
-
-$("adminMethodForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const name = $("methodName").value.trim();
-  if (!name) return;
-  defaultMethods.push(name);
-  renderPaymentMethods(defaultMethods);
-  renderAdminMethodList();
-  $("methodName").value = "";
-});
-
-function renderAdminMethodList() {
-  $("adminMethodList").innerHTML = defaultMethods.map((m, i) => `
-    <span class="method-chip">${m} ${i >= 3 ? `<button data-idx="${i}">✕</button>` : ""}</span>
-  `).join("");
-  $("adminMethodList").querySelectorAll("button[data-idx]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      defaultMethods.splice(parseInt(btn.dataset.idx, 10), 1);
-      renderPaymentMethods(defaultMethods);
-      renderAdminMethodList();
-    });
-  });
-}
-renderAdminMethodList();
-
-// Cargar usuarios del panel admin al entrar a esa vista
-document.querySelector('.nav-btn[data-view="admin"]')?.addEventListener("click", loadAdminUsers);
+  if (!currentProfile?.isAdmin) { $("adminGrantError").textContent = 
