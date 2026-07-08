@@ -3,7 +3,7 @@
 // Simulador educativo. Zephyr Token (ZFT) no tiene valor real.
 // ============================================================
 
-import { firebaseConfig } from "./firebase-config.js?v=2";
+import { firebaseConfig } from "./firebase-config.js?v=3";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
