@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Zephyr — Simulador de wallet</title>
+<meta name="description" content="Simulador educativo de una wallet de criptomoneda ficticia (Zephyr Token). No es un producto financiero real.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=2">
+</head>
+<body>
+
+<!-- ======================= DISCLAIMER BANNER ======================= -->
+<div class="disclaimer-banner" id="disclaimerBanner">
+  <span class="disclaimer-icon" aria-hidden="true">◐</span>
+  <p><strong>Esto es un simulador educativo, no un producto financiero real.</strong>
+  Zephyr Token no tiene ningún valor monetario. No introduzcas datos de tarjetas, contraseñas de PayPal ni ninguna información financiera real en ningún formulario de esta página.</p>
+  <button id="closeDisclaimer" aria-label="Cerrar aviso">✕</button>
+</div>
+
+<!-- ======================= AUTH SCREEN ======================= -->
+<main id="authScreen" class="auth-screen">
+  <div class="auth-hero">
+    <div class="gust-field" aria-hidden="true">
+      <span class="gust-line l1"></span>
+      <span class="gust-line l2"></span>
+      <span class="gust-line l3"></span>
+    </div>
+    <div class="auth-hero-content">
+      <div class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="42" height="42">
+          <path d="M6 18 C 16 18, 20 8, 32 8 C 40 8, 44 14, 40 20 C 36 26, 28 22, 30 16"
+                fill="none" stroke="url(#gustGrad)" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M4 28 C 18 28, 24 16, 38 16 C 44 16, 46 20, 44 24"
+                fill="none" stroke="url(#gustGrad)" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+          <defs>
+            <linearGradient id="gustGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#3FBFB0"/>
+              <stop offset="100%" stop-color="#F2A65A"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-word">Zephyr</span>
+      </div>
+      <h1>Una moneda que no existe,<br>para un grupo que sí.</h1>
+      <p class="auth-hero-sub">Regístrate, recibe Zephyr Token de cortesía, simula compras y envía saldo a tus amigos. Todo ficticio, todo de juguete.</p>
+
+      <div class="market-ticker" id="marketTicker" aria-label="Precios reales de mercado, solo como referencia">
+        <span class="ticker-label">Referencia de mercado real</span>
+        <div class="ticker-row" id="tickerRow">
+          <span class="ticker-item muted">cargando datos públicos…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-card-wrap">
+    <div class="auth-card">
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" id="tabLogin" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button class="auth-tab" id="tabRegister" role="tab" aria-selected="false">Crear cuenta</button>
+      </div>
+
+      <!-- LOGIN -->
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <label>Correo
+          <input type="email" id="loginEmail" required autocomplete="email" placeholder="tú@correo.com">
+        </label>
+        <label>Contraseña
+          <input type="password" id="loginPassword" required autocomplete="current-password" minlength="6" placeholder="••••••••">
+        </label>
+        <p class="form-error" id="loginError" role="alert"></p>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+
+      <!-- REGISTER -->
+      <form id="registerForm" class="auth-form hidden" autocomplete="on">
+        <label>Nombre de usuario
+          <input type="text" id="registerUsername" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" placeholder="ej. carlos_wind">
+        </label>
+        <label>Correo
+          <input type="email" id="registerEmail" required autocomplete="email" placeholder="tú@correo.com">
+        </label>
+        <label>Contraseña
+          <input type="password" id="registerPassword" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres">
+        </label>
+        <div class="g-recaptcha-wrap">
+          <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY" data-callback="onRecaptchaRegister"></div>
+        </div>
+        <p class="form-error" id="registerError" role="alert"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="registerSubmitBtn" disabled>Crear cuenta</button>
+        <p class="form-hint">El botón se activa al completar el reCAPTCHA.</p>
+      </form>
+    </div>
+  </div>
+</main>
+
+<!-- ======================= APP SHELL (post-login) ======================= -->
+<div id="appShell" class="app-shell hidden">
+
+  <header class="app-header">
+    <div class="logo-mark small" aria-hidden="true">
+      <svg viewBox="0 0 48 48" width="28" height="28">
+        <path d="M6 18 C 16 18, 20 8, 32 8 C 40 8, 44 14, 40 20 C 36 26, 28 22, 30 16"
+              fill="none" stroke="url(#gustGrad2)" stroke-width="4" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gustGrad2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#3FBFB0"/>
+            <stop offset="100%" stop-color="#F2A65A"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="logo-word">Zephyr</span>
+    </div>
+
+    <nav class="app-nav">
+      <button class="nav-btn active" data-view="dashboard">Wallet</button>
+      <button class="nav-btn" data-view="market">Mercado</button>
+      <button class="nav-btn hidden" id="navAdmin" data-view="admin">Panel Zephyr</button>
+    </nav>
+
+    <div class="header-right">
+      <span class="balance-chip" id="headerBalance">— ZFT</span>
+      <button class="user-menu-btn" id="userMenuBtn" aria-haspopup="true">
+        <span id="headerUsername">usuario</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="user-menu" id="userMenu">
+        <button id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ---------------- DASHBOARD VIEW ---------------- -->
+  <section class="view active" id="view-dashboard">
+    <div class="balance-hero">
+      <div class="gust-sweep" aria-hidden="true"></div>
+      <span class="balance-label">Tu saldo</span>
+      <div class="balance-value"><span id="balanceNumber">0</span><span class="balance-unit">ZFT</span></div>
+      <span class="balance-note">Zephyr Token — moneda ficticia sin valor real</span>
+      <div class="balance-actions">
+        <button class="btn btn-primary" id="openBuyModal">Comprar Zephyr</button>
+        <button class="btn btn-ghost" id="openTransferModal">Transferir</button>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="panel ledger-panel">
+        <div class="panel-head">
+          <h2>Historial</h2>
+          <span class="panel-sub">Movimientos de tu cartera</span>
+        </div>
+        <div class="ledger-list" id="ledgerList">
+          <p class="empty-state">Aún no tienes movimientos. Compra o recibe Zephyr para ver tu historial aquí.</p>
+        </div>
+      </div>
+
+      <div class="panel market-panel">
+        <div class="panel-head">
+          <h2>Referencia real</h2>
+          <span class="panel-sub">Datos públicos, no afectan tu saldo</span>
+        </div>
+        <div class="market-cards" id="marketCardsDashboard">
+          <div class="market-card skeleton">cargando…</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- MARKET VIEW ---------------- -->
+  <section class="view" id="view-market">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Mercado real (referencia informativa)</h2>
+        <span class="panel-sub">Precios públicos de bitcoin y ethereum. Zephyr Token es independiente de estos valores.</span>
+      </div>
+      <div class="market-cards large" id="marketCardsFull">
+        <div class="market-card skeleton">cargando…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- ADMIN VIEW ---------------- -->
+  <section class="view" id="view-admin">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Panel Zephyr</h2>
+        <span class="panel-sub">Visible solo para tu cuenta de administrador</span>
+      </div>
+
+      <div class="admin-grant">
+        <h3>Otorgar saldo</h3>
+        <form id="adminGrantForm" class="admin-form">
+          <label>Usuario destino
+            <input type="text" id="grantUsername" placeholder="nombre de usuario" required>
+          </label>
+          <label>Cantidad (ZFT)
+            <input type="number" id="grantAmount" min="1" step="1" required placeholder="ej. 500">
+          </label>
+          <button type="submit" class="btn btn-primary">Otorgar</button>
+        </form>
+        <p class="form-error" id="adminGrantError" role="alert"></p>
+        <p class="form-success" id="adminGrantSuccess" role="status"></p>
+      </div>
+
+      <div class="admin-users">
+        <h3>Usuarios registrados</h3>
+        <div class="user-table" id="adminUserTable">
+          <p class="empty-state">Cargando usuarios…</p>
+        </div>
+      </div>
+
+      <div class="admin-methods">
+        <h3>Métodos de pago simulados</h3>
+        <p class="panel-sub">Estos son los métodos ficticios que aparecen en el modal de compra.</p>
+        <form id="adminMethodForm" class="admin-form">
+          <label>Nombre del método
+            <input type="text" id="methodName" placeholder="ej. Tarjeta simulada" required>
+          </label>
+          <button type="submit" class="btn btn-secondary">Añadir método</button>
+        </form>
+        <div class="method-list" id="adminMethodList"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ======================= BUY MODAL ======================= -->
+<div class="modal-overlay hidden" id="buyModalOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buyModalTitle">
+    <button class="modal-close" data-close-modal="buy">✕</button>
+    <h2 id="buyModalTitle">Comprar Zephyr Token</h2>
+    <p class="modal-warning">⚠ Simulación. No introduzcas datos financieros reales en ningún campo de esta ventana.</p>
+
+    <div class="buy-steps" id="buyStep1">
+      <label class="field-label">Cantidad a comprar (ZFT)</label>
+      <input type="number" id="buyAmount" min="1" step="1" value="100">
+
+      <label class="field-label">Método de pago simulado</label>
+      <div class="payment-methods" id="paymentMethodPicker">
+        <!-- populated by JS -->
+      </div>
+
+      <div id="fakeCardFields" class="fake-payment-fields hidden">
+        <label>Número de tarjeta (ficticio)
+          <input type="text" id="fakeCardNumber" placeholder="4242 4242 4242 4242" maxlength="19">
+        </label>
+        <div class="field-row">
+          <label>Vence
+            <input type="text" id="fakeCardExpiry" placeholder="MM/AA" maxlength="5">
+          </label>
+          <label>CVV
+            <input type="text" id="fakeCardCvv" placeholder="123" maxlength="4">
+          </label>
+        </div>
+      </div>
+
+      <div id="fakePaypalFields" class="fake-payment-fields hidden">
+        <label>Correo de la cuenta (ficticio)
+          <input type="email" id="fakePaypalEmail" placeholder="nombre@ejemplo.com">
+        </label>
+        <p class="form-hint">Esto no se conecta a PayPal real. Es solo una pantalla de ejemplo.</p>
+      </div>
+
+      <div class="g-recaptcha-wrap">
+        <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY" data-callback="onRecaptchaBuy"></div>
+      </div>
+
+      <p class="form-error" id="buyError" role="alert"></p>
+      <button class="btn btn-primary btn-block" id="confirmBuyBtn" disabled>Simular compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= TRANSFER MODAL ======================= -->
+<div class="modal-overlay hidden" id="transferModalOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="transferModalTitle">
+    <button class="modal-close" data-close-modal="transfer">✕</button>
+    <h2 id="transferModalTitle">Transferir Zephyr</h2>
+
+    <label class="field-label">Usuario destinatario</label>
+    <input type="text" id="transferUsername" placeholder="nombre de usuario">
+
+    <label class="field-label">Cantidad (ZFT)</label>
+    <input type="number" id="transferAmount" min="1" step="1">
+
+    <div class="g-recaptcha-wrap">
+      <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY" data-callback="onRecaptchaTransfer"></div>
+    </div>
+
+    <p class="form-error" id="transferError" role="alert"></p>
+    <p class="form-success" id="transferSuccess" role="status"></p>
+    <button class="btn btn-primary btn-block" id="confirmTransferBtn" disabled>Enviar Zephyr</button>
+  </div>
+</div>
+
+<!-- ======================= SCRIPTS DE PRUEBA (sin Firebase) ======================= -->
+<script>
+  document.getElementById("closeDisclaimer").addEventListener("click", () => {
+    document.getElementById("disclaimerBanner").classList.add("hidden");
+  });
+
+  const marker = document.createElement("div");
+  marker.style.cssText = "position:fixed; bottom:0; left:0; right:0; background:#5FD79A; color:#0D0E1C; text-align:center; padding:14px; font-weight:bold; z-index:99999;";
+  marker.textContent = "✅ JS básico SÍ funciona en esta página real (sin Firebase)";
+  document.body.appendChild(marker);
+</script>
+</body>
+</html>
+
