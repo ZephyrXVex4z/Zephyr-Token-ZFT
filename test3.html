@@ -29,6 +29,9 @@
     const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
     detailEl.textContent += 'Paso 2 OK: firebase-auth.js importado.\n';
 
+    const { getFirestore, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    detailEl.textContent += 'Paso 2.5 OK: firebase-firestore.js importado.\n';
+
     const firebaseConfig = {
       apiKey: "AIzaSyAW1dR6J24tGhaxlYfrfgPUFbqO5pLd8E0",
       authDomain: "zephyr-token.firebaseapp.com",
@@ -44,9 +47,16 @@
     const auth = getAuth(app);
     detailEl.textContent += 'Paso 4 OK: getAuth() ejecutado sin errores.\n';
 
-    statusEl.textContent = '✅ Firebase se cargó e inicializó correctamente';
+    const db = getFirestore(app);
+    detailEl.textContent += 'Paso 5 OK: getFirestore() ejecutado sin errores.\n';
+
+    detailEl.textContent += 'Paso 6: intentando LEER un documento de prueba de Firestore...\n';
+    const testSnap = await getDoc(doc(db, "usernames", "___test_conexion___"));
+    detailEl.textContent += `Paso 6 OK: lectura de Firestore respondió (existe=${testSnap.exists()}), sin errores de red/permiso.\n`;
+
+    statusEl.textContent = '✅ Firebase y Firestore funcionan correctamente';
     statusEl.style.color = '#5FD79A';
-    detailEl.textContent += '\n🎉 TODO BIEN — Firebase no es el problema.';
+    detailEl.textContent += '\n🎉 TODO BIEN — Firebase/Firestore no son el problema.';
 
   } catch (err) {
     statusEl.textContent = '❌ Firebase falló al cargar';
@@ -57,4 +67,3 @@
 
 </body>
 </html>
-
