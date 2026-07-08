@@ -300,7 +300,151 @@
 <!-- ======================= SCRIPTS ======================= -->
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
-<script type="module" src="js/firebase-config.js?v=2"></script>
-<script type="module" src="js/app.js?v=2"></script>
-</body>
-</html>
+<script>
+// ============================================================
+// ZEPHYR — todo el código va inline aquí para eliminar por completo
+// cualquier problema de carga/caché de archivos .js externos como
+// módulos. El panel de diagnóstico se crea ANTES que nada, así que
+// si algo falla después, al menos veremos ese primer mensaje.
+// ============================================================
+const debugPanel = document.createElement("div");
+debugPanel.id = "zephyrDebugPanel";
+debugPanel.style.cssText = `
+  position: fixed; bottom: 0; left: 0; right: 0; max-height: 40vh;
+  overflow-y: auto; background: rgba(0,0,0,0.92); color: #7CFFB2;
+  font-family: monospace; font-size: 11px; line-height: 1.5;
+  padding: 8px 10px; z-index: 99999; border-top: 2px solid #3FBFB0;
+  white-space: pre-wrap; word-break: break-word;
+`;
+const debugHeader = document.createElement("div");
+debugHeader.style.cssText = "display:flex; justify-content:space-between; align-items:center; color:#F2A65A; font-weight:bold; margin-bottom:4px;";
+debugHeader.innerHTML = `<span>🔧 Diagnóstico Zephyr (toca ✕ para ocultar)</span>`;
+const closeDebugBtn = document.createElement("button");
+closeDebugBtn.textContent = "✕";
+closeDebugBtn.style.cssText = "color:#F2A65A; background:none; border:1px solid #F2A65A; border-radius:4px; padding:2px 8px;";
+closeDebugBtn.onclick = () => debugPanel.remove();
+debugHeader.appendChild(closeDebugBtn);
+const debugLogEl = document.createElement("div");
+debugPanel.appendChild(debugHeader);
+debugPanel.appendChild(debugLogEl);
+document.body.appendChild(debugPanel);
+
+function debugLog(msg, isError = false) {
+  const line = document.createElement("div");
+  const time = new Date().toLocaleTimeString("es-ES");
+  line.textContent = `[${time}] ${msg}`;
+  if (isError) line.style.color = "#F17389";
+  debugLogEl.appendChild(line);
+  debugLogEl.scrollTop = debugLogEl.scrollHeight;
+}
+
+window.addEventListener("error", (e) => {
+  debugLog(`ERROR JS: ${e.message} (línea ${e.lineno})`, true);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  debugLog(`ERROR PROMESA: ${e.reason?.message || e.reason}`, true);
+});
+
+debugLog("Script inline arrancó correctamente. Cargando Firebase…");
+
+// Todo lo demás corre dentro de esta función async, usando import()
+// dinámico en vez de 'import' estático — más compatible con
+// navegadores móviles cuando hay problemas con <script type="module">.
+(async () => {
+  try {
+    const firebaseConfig = {
+      apiKey: "AIzaSyAW1dR6J24tGhaxlYfrfgPUFbqO5pLd8E0",
+      authDomain: "zephyr-token.firebaseapp.com",
+      projectId: "zephyr-token",
+      storageBucket: "zephyr-token.firebasestorage.app",
+      messagingSenderId: "699262176178",
+      appId: "1:699262176178:web:b7b992c81c7faf9d9fb2ab"
+    };
+
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const {
+      getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+      signOut, onAuthStateChanged
+    } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    const {
+      getFirestore, doc, getDoc, setDoc, onSnapshot,
+      collection, query, where, getDocs, addDoc, serverTimestamp,
+      runTransaction, orderBy, limit
+    } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+    debugLog("Firebase cargado correctamente. Inicializando app…");
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    debugLog("Firebase inicializado OK.");
+
+    // ------------------------------------------------------------
+    // Estado local
+    // ------------------------------------------------------------
+    let currentUser = null;
+    let currentProfile = null;
+    let unsubUserDoc = null;
+    let unsubTx = null;
+    let recaptchaOk = { register: false, buy: false, transfer: false };
+    let selectedPaymentMethod = null;
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => Number(n ?? 0).toLocaleString("es-ES");
+
+    function showAuthScreen() {
+      $("authScreen").classList.remove("hidden");
+      $("appShell").classList.add("hidden");
+    }
+    function showAppShell() {
+      $("authScreen").classList.add("hidden");
+      $("appShell").classList.remove("hidden");
+    }
+    function switchView(viewName) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      $(`view-${viewName}`).classList.add("active");
+      document.querySelector(`.nav-btn[data-view="${viewName}"]`)?.classList.add("active");
+    }
+
+    window.onRecaptchaRegister = () => { recaptchaOk.register = true; $("registerSubmitBtn").disabled = false; };
+    window.onRecaptchaBuy = () => { recaptchaOk.buy = true; $("confirmBuyBtn").disabled = false; };
+    window.onRecaptchaTransfer = () => { recaptchaOk.transfer = true; $("confirmTransferBtn").disabled = false; };
+
+    $("tabLogin").addEventListener("click", () => {
+      $("tabLogin").classList.add("active"); $("tabLogin").setAttribute("aria-selected", "true");
+      $("tabRegister").classList.remove("active"); $("tabRegister").setAttribute("aria-selected", "false");
+      $("loginForm").classList.remove("hidden");
+      $("registerForm").classList.add("hidden");
+    });
+    $("tabRegister").addEventListener("click", () => {
+      $("tabRegister").classList.add("active"); $("tabRegister").setAttribute("aria-selected", "true");
+      $("tabLogin").classList.remove("active"); $("tabLogin").setAttribute("aria-selected", "false");
+      $("registerForm").classList.remove("hidden");
+      $("loginForm").classList.add("hidden");
+    });
+
+    $("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("registerError").textContent = "";
+      if (!recaptchaOk.register) {
+        $("registerError").textContent = "Completa el reCAPTCHA antes de continuar.";
+        return;
+      }
+      const username = $("registerUsername").value.trim();
+      const email = $("registerEmail").value.trim();
+      const password = $("registerPassword").value;
+      const usernameLower = username.toLowerCase();
+
+      try {
+        const usernameSnap = await getDoc(doc(db, "usernames", usernameLower));
+        if (usernameSnap.exists()) {
+          $("registerError").textContent = "Ese nombre de usuario ya está en uso.";
+          return;
+        }
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        try {
+          await setDoc(doc(db, "usernames", usernameLower), { uid: cred.user.uid });
+        } catch (_) { /* no bloquea el registro */ }
+       
