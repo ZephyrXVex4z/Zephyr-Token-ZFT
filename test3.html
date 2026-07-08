@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba Firebase</title>
+</head>
+<body style="font-family: sans-serif; text-align:center; padding:40px 20px; background:#14162B; color:white;">
+
+<h1 id="status" style="color:#F2A65A;">⏳ Probando conexión con Firebase…</h1>
+<pre id="detail" style="text-align:left; background:#1B1D38; padding:16px; border-radius:8px; white-space:pre-wrap; word-break:break-word; font-size:13px;"></pre>
+
+<script type="module">
+  const statusEl = document.getElementById('status');
+  const detailEl = document.getElementById('detail');
+
+  window.addEventListener('error', (e) => {
+    statusEl.textContent = '❌ ERROR JS capturado';
+    statusEl.style.color = '#F17389';
+    detailEl.textContent += `\nERROR: ${e.message}`;
+  });
+
+  try {
+    detailEl.textContent = 'Paso 1: intentando importar firebase-app.js...\n';
+
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    detailEl.textContent += 'Paso 1 OK: firebase-app.js importado.\n';
+
+    const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+    detailEl.textContent += 'Paso 2 OK: firebase-auth.js importado.\n';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAW1dR6J24tGhaxlYfrfgPUFbqO5pLd8E0",
+      authDomain: "zephyr-token.firebaseapp.com",
+      projectId: "zephyr-token",
+      storageBucket: "zephyr-token.firebasestorage.app",
+      messagingSenderId: "699262176178",
+      appId: "1:699262176178:web:b7b992c81c7faf9d9fb2ab"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    detailEl.textContent += 'Paso 3 OK: initializeApp() ejecutado sin errores.\n';
+
+    const auth = getAuth(app);
+    detailEl.textContent += 'Paso 4 OK: getAuth() ejecutado sin errores.\n';
+
+    statusEl.textContent = '✅ Firebase se cargó e inicializó correctamente';
+    statusEl.style.color = '#5FD79A';
+    detailEl.textContent += '\n🎉 TODO BIEN — Firebase no es el problema.';
+
+  } catch (err) {
+    statusEl.textContent = '❌ Firebase falló al cargar';
+    statusEl.style.color = '#F17389';
+    detailEl.textContent += `\n\nERROR CAPTURADO:\nNombre: ${err.name}\nMensaje: ${err.message}\nStack: ${err.stack || '(sin stack)'}`;
+  }
+</script>
+
+</body>
+</html>
+
