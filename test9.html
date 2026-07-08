@@ -382,10 +382,20 @@ $("loginForm").addEventListener("submit", async (e) => {
 
 $("logoutBtn").addEventListener("click", () => signOut(auth));
 
+function showAuthScreen() {
+  $("authScreen").classList.remove("hidden");
+  $("appShell").classList.add("hidden");
+}
+function showAppShell() {
+  $("authScreen").classList.add("hidden");
+  $("appShell").classList.remove("hidden");
+}
+
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
-  if (!user) { log("Sin sesión."); return; }
+  if (!user) { log("Sin sesión."); showAuthScreen(); return; }
   log("✅ Sesión: " + user.email);
+  showAppShell();
   onSnapshot(doc(db, "users", user.uid), (snap) => {
     if (!snap.exists()) { log("Doc no existe"); return; }
     currentProfile = snap.data();
@@ -416,4 +426,3 @@ log("test8 cargado completo. Listo.");
 </script>
 </body>
 </html>
-
