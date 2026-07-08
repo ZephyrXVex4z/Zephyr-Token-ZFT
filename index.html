@@ -304,7 +304,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAW1dR6J24tGhaxlYfrfgPUFbqO5pLd8E0",
@@ -319,23 +319,25 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const marker = document.createElement("div");
-marker.style.cssText = "position:fixed; bottom:0; left:0; right:0; max-height:40vh; overflow-y:auto; background:#111; color:#5FD79A; text-align:left; padding:14px; font-family:monospace; font-size:12px; z-index:99999; white-space:pre-wrap;";
-marker.textContent = "test8 arrancando...\n";
-document.body.appendChild(marker);
-function log(msg) { marker.textContent += msg + "\n"; }
-
-window.addEventListener("error", (e) => {
-  log("🔴 ERROR JS: " + e.message + " (línea " + e.lineno + ", col " + e.colno + ")");
-});
-window.addEventListener("unhandledrejection", (e) => {
-  log("🔴 ERROR PROMESA: " + (e.reason?.message || e.reason));
-});
+window.addEventListener("error", (e) => console.error("ERROR JS:", e.message, e.lineno));
+window.addEventListener("unhandledrejection", (e) => console.error("ERROR PROMESA:", e.reason));
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n ?? 0).toLocaleString("es-ES");
 let currentUser = null;
 let currentProfile = null;
+let recaptchaOk = { register: false };
+
+function showAuthScreen() {
+  $("authScreen").classList.remove("hidden");
+  $("appShell").classList.add("hidden");
+}
+function showAppShell() {
+  $("authScreen").classList.add("hidden");
+  $("appShell").classList.remove("hidden");
+}
+
+window.onRecaptchaRegister = () => { recaptchaOk.register = true; $("registerSubmitBtn").disabled = false; };
 
 $("closeDisclaimer").addEventListener("click", () => $("disclaimerBanner").classList.add("hidden"));
 
@@ -352,62 +354,65 @@ $("tabRegister").addEventListener("click", () => {
   $("loginForm").classList.add("hidden");
 });
 
-// --- REGISTRO (copiado del app.js real) ---
 $("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  log("Submit de registro capturado.");
+  $("registerError").textContent = "";
+  if (!recaptchaOk.register) { $("registerError").textContent = "Completa el reCAPTCHA."; return; }
   const username = $("registerUsername").value.trim();
   const email = $("registerEmail").value.trim();
   const password = $("registerPassword").value;
   const usernameLower = username.toLowerCase();
   try {
     const usernameSnap = await getDoc(doc(db, "usernames", usernameLower));
-    if (usernameSnap.exists()) { log("Usuario ya existe"); return; }
+    if (usernameSnap.exists()) { $("registerError").textContent = "Ese nombre de usuario ya está en uso."; return; }
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "usernames", usernameLower), { uid: cred.user.uid });
+    try { await setDoc(doc(db, "usernames", usernameLower), { uid: cred.user.uid }); } catch (_) {}
     await setDoc(doc(db, "users", cred.user.uid), {
       username, usernameLower, email, balance: 100, isAdmin: false, createdAt: serverTimestamp()
     });
-    log("Registro OK");
+    await addDoc(collection(db, "users", cred.user.uid, "transactions"), {
+      type: "bonus", amount: 100, note: "Regalo de bienvenida", createdAt: serverTimestamp()
+    });
   } catch (err) {
-    log("ERROR registro: " + err.message);
+    $("registerError").textContent = traduceErrorFirebase(err);
   }
 });
 
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  log("Submit del login capturado.");
+  $("loginError").textContent = "";
   const email = $("loginEmail").value.trim();
   const password = $("loginPassword").value;
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    log("✅ Login OK");
   } catch (err) {
-    log("❌ ERROR login: " + err.message);
+    $("loginError").textContent = traduceErrorFirebase(err);
   }
 });
 
 $("logoutBtn").addEventListener("click", () => signOut(auth));
 
-function showAuthScreen() {
-  $("authScreen").classList.remove("hidden");
-  $("appShell").classList.add("hidden");
-}
-function showAppShell() {
-  $("authScreen").classList.add("hidden");
-  $("appShell").classList.remove("hidden");
+function traduceErrorFirebase(err) {
+  const code = err?.code || "";
+  if (code.includes("email-already-in-use")) return "Ese correo ya tiene una cuenta.";
+  if (code.includes("invalid-email")) return "Correo no válido.";
+  if (code.includes("weak-password")) return "La contraseña es demasiado corta.";
+  if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) return "Correo o contraseña incorrectos.";
+  return "Ocurrió un error. Inténtalo de nuevo.";
 }
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
-  if (!user) { log("Sin sesión."); showAuthScreen(); return; }
-  log("✅ Sesión: " + user.email);
+  if (!user) { currentProfile = null; showAuthScreen(); return; }
   showAppShell();
   onSnapshot(doc(db, "users", user.uid), (snap) => {
-    if (!snap.exists()) { log("Doc no existe"); return; }
+    if (!snap.exists()) return;
     currentProfile = snap.data();
     renderProfile();
-  }, (err) => log("ERROR firestore: " + err.message));
+  }, (err) => console.error("ERROR firestore:", err));
+
+  const txQuery = query(collection(db, "users", user.uid, "transactions"), orderBy("createdAt", "desc"), limit(25));
+  onSnapshot(txQuery, (snap) => renderLedger(snap.docs.map(d => d.data())));
 });
 
 function renderProfile() {
@@ -416,7 +421,26 @@ function renderProfile() {
   $("headerUsername").textContent = currentProfile.username;
   $("balanceNumber").textContent = fmt(currentProfile.balance);
   $("navAdmin").classList.toggle("hidden", !currentProfile.isAdmin);
-  log("renderProfile ejecutado OK. isAdmin=" + currentProfile.isAdmin);
+}
+
+function renderLedger(txs) {
+  const list = $("ledgerList");
+  if (!txs.length) {
+    list.innerHTML = `<p class="empty-state">Aún no tienes movimientos. Compra o recibe Zephyr para ver tu historial aquí.</p>`;
+    return;
+  }
+  list.innerHTML = txs.map(tx => {
+    const isIn = tx.amount >= 0;
+    const label = {
+      bonus: "Regalo de bienvenida",
+      buy: `Compra simulada (${tx.method || "método simulado"})`,
+      transfer_in: `Recibido de ${tx.from || "alguien"}`,
+      transfer_out: `Enviado a ${tx.to || "alguien"}`,
+      admin_grant: "Otorgado por administración"
+    }[tx.type] || tx.type;
+    const when = tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString("es-ES") : "…";
+    return `<div class="ledger-row"><span class="ledger-icon ${isIn ? "in" : "out"}">${isIn ? "↓" : "↑"}</span><div class="ledger-main"><div class="ledger-title">${label}</div><div class="ledger-meta">${when}</div></div><span class="ledger-amount ${isIn ? "in" : "out"}">${isIn ? "+" : ""}${fmt(tx.amount)} ZFT</span></div>`;
+  }).join("");
 }
 
 document.querySelectorAll(".nav-btn").forEach(btn => {
@@ -425,31 +449,7 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
     $("view-" + btn.dataset.view).classList.add("active");
     btn.classList.add("active");
-    if (btn.dataset.view === "admin") loadAdminUsers();
   });
 });
 
-// ------------------------------------------------------------
-// reCAPTCHA callbacks
-// ------------------------------------------------------------
-let recaptchaOk = { buy: false, transfer: false };
-window.onRecaptchaBuy = () => { recaptchaOk.buy = true; $("confirmBuyBtn").disabled = false; };
-window.onRecaptchaTransfer = () => { recaptchaOk.transfer = true; $("confirmTransferBtn").disabled = false; };
-window.onRecaptchaRegister = () => { recaptchaOk.register = true; $("registerSubmitBtn").disabled = false; };
-
-// ------------------------------------------------------------
-// MODAL: compra simulada
-// ------------------------------------------------------------
-const defaultMethods = ["Tarjeta simulada", "PayPal simulado", "Transferencia simulada"];
-let selectedPaymentMethod = null;
-
-function renderPaymentMethods(methods) {
-  const wrap = $("paymentMethodPicker");
-  wrap.innerHTML = methods.map(m => `<button type="button" class="payment-method-option" data-method="${m}">${m}</button>`).join("");
-  wrap.querySelectorAll(".payment-method-option").forEach(btn => {
-    btn.addEventListener("click", () => {
-      wrap.querySelectorAll(".payment-method-option").forEach(b => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      selectedPaymentMethod = btn.dataset.method;
-      $("fakeCardFields").classList.toggle("hidden", !btn.dataset.method.toLowerCase().includes("tarjeta"));
-      $("fakePaypalFields").classList.toggle("hidden", !btn.dataset.method.toLowerCase().includes("paypal"));
+$("userMenuBtn").addEventLis2
