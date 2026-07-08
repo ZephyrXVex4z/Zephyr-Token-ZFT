@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Zephyr — Simulador de wallet</title>
+<meta name="description" content="Simulador educativo de una wallet de criptomoneda ficticia (Zephyr Token). No es un producto financiero real.">
+
+<!-- Precarga de fuentes -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- CSS principal -->
+<link rel="stylesheet" href="css/style.css?v=2">
+
+<!-- Firebase SDKs (mismos IDs y APIs originales) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<!-- Configuración de Firebase (manteniendo APIs originales) -->
+<script>
+  // Configuración de Firebase (usa tus propias credenciales aquí)
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "tu-proyecto.firebaseapp.com",
+    projectId: "tu-proyecto",
+    storageBucket: "tu-proyecto.appspot.com",
+    messagingSenderId: "TU_SENDER_ID",
+    appId: "TU_APP_ID",
+    measurementId: "TU_MEASUREMENT_ID"
+  };
+
+  // Inicializar Firebase
+  firebase.initializeApp(firebaseConfig);
+  
+  // Referencias a servicios (para usar en app.js)
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const rtdb = firebase.database();
+  
+  // Hacer disponibles globalmente para app.js
+  window.firebaseServices = {
+    auth: auth,
+    db: db,
+    rtdb: rtdb,
+    firebase: firebase
+  };
+</script>
+
+<style>
+  /* Estilos críticos para evitar parpadeo */
+  .app-shell.hidden, .auth-screen.hidden, .view:not(.active), .modal-overlay.hidden {
+    display: none !important;
+  }
+  
+  .auth-form.hidden {
+    display: none !important;
+  }
+  
+  .auth-tab.active {
+    border-bottom: 2px solid var(--accent-primary);
+    color: var(--text-primary);
+  }
+</style>
+</head>
+<body>
+
+<!-- Banner de disclaimer educativo -->
+<div class="disclaimer-banner" id="disclaimerBanner">
+  <span class="disclaimer-icon" aria-hidden="true">◐</span>
+  <p><strong>Esto es un simulador educativo, no un producto financiero real.</strong></p>
+  <button id="closeDisclaimer" aria-label="Cerrar aviso">✕</button>
+</div>
+
+<!-- Pantalla de autenticación (login/registro) -->
+<main id="authScreen" class="auth-screen">
+  <div class="auth-hero">
+    <div class="auth-hero-content">
+      <div class="logo-mark" aria-hidden="true">
+        <span class="logo-word">Zephyr</span>
+      </div>
+      <h1>Una moneda que no existe,<br>para un grupo que sí.</h1>
+    </div>
+  </div>
+
+  <div class="auth-card-wrap">
+    <div class="auth-card">
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" id="tabLogin" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button class="auth-tab" id="tabRegister" role="tab" aria-selected="false">Crear cuenta</button>
+      </div>
+
+      <!-- Formulario de inicio de sesión -->
+      <form id="loginForm" class="auth-form" autocomplete="on" novalidate>
+        <div class="form-group">
+          <label for="loginEmail">Correo electrónico</label>
+          <input type="email" id="loginEmail" name="loginEmail" required autocomplete="email" placeholder="tu@correo.com">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Contraseña</label>
+          <input type="password" id="loginPassword" name="loginPassword" required autocomplete="current-password" placeholder="••••••••" minlength="6">
+        </div>
+        <p class="form-error" id="loginError" role="alert" aria-live="polite"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn">
+          <span class="btn-text">Entrar</span>
+          <span class="btn-loader hidden" aria-hidden="true">⟳</span>
+        </button>
+      </form>
+
+      <!-- Formulario de registro (conexión con reCaptcha y Firebase) -->
+      <form id="registerForm" class="auth-form hidden" autocomplete="on" novalidate>
+        <div class="form-group">
+          <label for="registerUsername">Nombre de usuario</label>
+          <input type="text" id="registerUsername" name="registerUsername" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" placeholder="usuario_ejemplo" autocomplete="username">
+          <small class="form-hint">Solo letras, números y guiones bajos (3-20 caracteres)</small>
+        </div>
+        <div class="form-group">
+          <label for="registerEmail">Correo electrónico</label>
+          <input type="email" id="registerEmail" name="registerEmail" required autocomplete="email" placeholder="tu@correo.com">
+        </div>
+        <div class="form-group">
+          <label for="registerPassword">Contraseña</label>
+          <input type="password" id="registerPassword" name="registerPassword" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres">
+        </div>
+        
+        <!-- reCaptcha v2 Checkbox (misma API key original) -->
+        <div class="form-group recaptcha-container">
+          <div class="g-recaptcha" 
+               data-sitekey="6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp"
+               data-callback="onRecaptchaSuccess"
+               data-expired-callback="onRecaptchaExpired"
+               id="recaptchaWidget">
+          </div>
+        </div>
+        
+        <p class="form-error" id="registerError" role="alert" aria-live="polite"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="registerSubmitBtn" disabled>
+          <span class="btn-text">Crear cuenta</span>
+          <span class="btn-loader hidden" aria-hidden="true">⟳</span>
+        </button>
+        <input type="hidden" id="recaptchaToken" name="recaptchaToken">
+      </form>
+    </div>
+  </div>
+</main>
+
+<!-- Shell de la aplicación (panel principal) -->
+<div id="appShell" class="app-shell hidden">
+  <header class="app-header">
+    <nav class="app-nav" role="navigation" aria-label="Navegación principal">
+      <button class="nav-btn active" data-view="dashboard" aria-current="page">Wallet</button>
+      <button class="nav-btn" data-view="market">Mercado</button>
+      <button class="nav-btn hidden" id="navAdmin" data-view="admin">Panel Zephyr</button>
+    </nav>
+    <div class="header-right">
+      <span class="balance-chip" id="headerBalance" aria-live="polite">— ZFT</span>
+      <button class="user-menu-btn" id="userMenuBtn" aria-haspopup="true" aria-expanded="false">
+        <span id="headerUsername">usuario</span>
+        <span class="dropdown-arrow" aria-hidden="true">▾</span>
+      </button>
+      <div class="user-menu hidden" id="userMenu" role="menu" aria-labelledby="userMenuBtn">
+        <button id="logoutBtn" role="menuitem">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Vista: Dashboard/Wallet -->
+  <section class="view active" id="view-dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+    <div class="balance-hero">
+      <div class="balance-value">
+        <span id="balanceNumber">0</span>
+        <span class="balance-unit">ZFT</span>
+      </div>
+      <div class="balance-actions">
+        <button class="btn btn-primary" id="openBuyModal">Comprar Zephyr</button>
+        <button class="btn btn-ghost" id="openTransferModal">Transferir</button>
+      </div>
+    </div>
+    
+    <!-- Historial de transacciones (opcional, se llena dinámicamente) -->
+    <div class="transaction-history" id="transactionHistory">
+      <h3>Historial de transacciones</h3>
+      <div id="transactionList" class="transaction-list">
+        <p class="empty-state">No hay transacciones aún</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vista: Mercado (placeholder) -->
+  <section class="view" id="view-market" role="tabpanel" aria-labelledby="market-tab">
+    <div class="panel">
+      <h2>Mercado Zephyr</h2>
+      <p>Próximamente: gráficos y estadísticas del token ZFT</p>
+    </div>
+  </section>
+
+  <!-- Vista: Panel de Administración (solo visible para admins) -->
+  <section class="view" id="view-admin" role="tabpanel" aria-labelledby="admin-tab">
+    <div class="panel">
+      <h2>Panel de Administración Zephyr</h2>
+      
+      <!-- Sección: Otorgar saldo (crear ZFT) -->
+      <div class="admin-section admin-grant">
+        <h3>Crear / Otorgar ZFT</h3>
+        <p class="section-description">Genera nuevos ZFT y asígnalos a cualquier usuario</p>
+        <form id="adminGrantForm" class="admin-form" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="grantUsername">Usuario destino</label>
+              <input type="text" id="grantUsername" name="grantUsername" placeholder="Nombre de usuario" required>
+            </div>
+            <div class="form-group">
+              <label for="grantAmount">Cantidad de ZFT</label>
+              <input type="number" id="grantAmount" name="grantAmount" placeholder="0.00" min="0.01" step="any" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="grantSubmitBtn">Otorgar ZFT</button>
+        </form>
+        <p class="form-message error" id="adminGrantError" role="alert" aria-live="polite"></p>
+        <p class="form-message success" id="adminGrantSuccess" role="status" aria-live="polite"></p>
+      </div>
+      
+      <!-- Sección: Métodos de pago (gestión en Firebase) -->
+      <div class="admin-section admin-methods">
+        <h3>Gestión de Métodos de Pago</h3>
+        <p class="section-description">Administra los métodos disponibles para comprar ZFT</p>
+        <form id="adminMethodForm" class="admin-form" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="methodName">Nombre del método</label>
+              <input type="text" id="methodName" name="methodName" placeholder="Ej: PayPal, Transferencia, etc." required>
+            </div>
+            <div class="form-group">
+              <label for="methodDetails">Detalles / Instrucciones</label>
+              <input type="text" id="methodDetails" name="methodDetails" placeholder="Información adicional para el usuario">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-secondary" id="methodSubmitBtn">Añadir Método</button>
+        </form>
+        <p class="form-message error" id="adminMethodError" role="alert" aria-live="polite"></p>
+        <p class="form-message success" id="adminMethodSuccess" role="status" aria-live="polite"></p>
+        
+        <!-- Lista de métodos de pago existentes -->
+        <div class="methods-list-container">
+          <h4>Métodos disponibles actualmente</h4>
+          <div id="adminMethodList" class="method-list">
+            <p class="empty-state">Cargando métodos...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Modal: Comprar Zephyr -->
+<div class="modal-overlay hidden" id="buyModalOverlay" role="dialog" aria-modal="true" aria-labelledby="buyModalTitle">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="buy" aria-label="Cerrar modal">✕</button>
+    <h2 id="buyModalTitle">Comprar Zephyr</h2>
+    <p class="modal-description">Selecciona un método de pago para obtener ZFT</p>
+    <div class="payment-methods" id="paymentMethodPicker">
+      <p class="empty-state">Cargando métodos de pago...</p>
+    </div>
+    <p class="form-message error" id="buyError" role="alert" aria-live="polite"></p>
+    <p class="form-message success" id="buySuccess" role="status" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- Modal: Transferir Zephyr -->
+<div class="modal-overlay hidden" id="transferModalOverlay" role="dialog" aria-modal="true" aria-labelledby="transferModalTitle">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="transfer" aria-label="Cerrar modal">✕</button>
+    <h2 id="transferModalTitle">Transferir Zephyr</h2>
+    
+    <!-- Información de balance para transferencias -->
+    <div class="transfer-info">
+      <p>Tu balance actual: <strong id="transferBalance">0 ZFT</strong></p>
+    </div>
+    
+    <div class="form-group">
+      <label for="transferUsername">Usuario destino</label>
+      <input type="text" id="transferUsername" name="transferUsername" placeholder="Nombre de usuario" required>
+    </div>
+    <div class="form-group">
+      <label for="transferAmount">Cantidad a transferir</label>
+      <input type="number" id="transferAmount" name="transferAmount" placeholder="0.00" min="0.01" step="any" required>
+    </div>
+    
+    <button class="btn btn-primary btn-block" id="confirmTransferBtn">
+      <span class="btn-text">Enviar Zephyr</span>
+      <span class="btn-loader hidden" aria-hidden="true">⟳</span>
+    </button>
+    
+    <p class="form-message error" id="transferError" role="alert" aria-live="polite"></p>
+    <p class="form-message success" id="transferSuccess" role="status" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- reCaptcha API (script original) -->
+<script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
+
+<!-- Función de callback para reCaptcha -->
+<script>
+  // Variables globales para reCaptcha
+  let recaptchaWidgetId = null;
+  let recaptchaVerified = false;
+  
+  // Callback cuando reCaptcha se carga
+  function onRecaptchaLoad() {
+    console.log('reCaptcha API cargada');
+    // El widget se renderizará cuando se muestre el formulario de registro
+  }
+  
+  // Callback cuando el usuario completa el reCaptcha
+  function onRecaptchaSuccess(token) {
+    console.log('reCaptcha verificado exitosamente');
+    recaptchaVerified = true;
+    document.getElementById('recaptchaToken').value = token;
+    
+    // Habilitar el botón de registro
+    const registerBtn = document.getElementById('registerSubmitBtn');
+    if (registerBtn) {
+      registerBtn.disabled = false;
+    }
+  }
+  
+  // Callback cuando el token de reCaptcha expira
+  function onRecaptchaExpired() {
+    console.log('Token de reCaptcha expirado');
+    recaptchaVerified = false;
+    document.getElementById('recaptchaToken').value = '';
+    
+    // Deshabilitar el botón de registro
+    const registerBtn = document.getElementById('registerSubmitBtn');
+    if (registerBtn) {
+      registerBtn.disabled = true;
+    }
+  }
+  
+  // Función para renderizar el widget de reCaptcha
+  function renderRecaptcha() {
+    const container = document.getElementById('recaptchaWidget');
+    if (container && !recaptchaWidgetId) {
+      try {
+        recaptchaWidgetId = grecaptcha.render(container, {
+          'sitekey': '6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp',
+          'callback': 'onRecaptchaSuccess',
+          'expired-callback': 'onRecaptchaExpired'
+        });
+        console.log('Widget de reCaptcha renderizado');
+      } catch (error) {
+        console.error('Error al renderizar reCaptcha:', error);
+      }
+    }
+  }
+  
+  // Resetear reCaptcha
+  function resetRecaptcha() {
+    if (recaptchaWidgetId !== null) {
+      grecaptcha.reset(recaptchaWidgetId);
+      recaptchaVerified = false;
+      document.getElementById('recaptchaToken').value = '';
+      document.getElementById('registerSubmitBtn').disabled = true;
+    }
+  }
+  
+  // Hacer disponibles las funciones globalmente
+  window.recaptchaFunctions = {
+    renderRecaptcha: renderRecaptcha,
+    resetRecaptcha: resetRecaptcha,
+    isVerified: () => recaptchaVerified
+  };
+</script>
+
+<!-- Script principal de la aplicación (módulo ES6) -->
+<script type="module" src="js/app.js"></script>
+
+</body>
+      </html>
