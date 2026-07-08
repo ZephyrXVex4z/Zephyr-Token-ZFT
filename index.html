@@ -325,6 +325,13 @@ marker.textContent = "test8 arrancando...\n";
 document.body.appendChild(marker);
 function log(msg) { marker.textContent += msg + "\n"; }
 
+window.addEventListener("error", (e) => {
+  log("🔴 ERROR JS: " + e.message + " (línea " + e.lineno + ", col " + e.colno + ")");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  log("🔴 ERROR PROMESA: " + (e.reason?.message || e.reason));
+});
+
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n ?? 0).toLocaleString("es-ES");
 let currentUser = null;
@@ -446,10 +453,3 @@ function renderPaymentMethods(methods) {
       selectedPaymentMethod = btn.dataset.method;
       $("fakeCardFields").classList.toggle("hidden", !btn.dataset.method.toLowerCase().includes("tarjeta"));
       $("fakePaypalFields").classList.toggle("hidden", !btn.dataset.method.toLowerCase().includes("paypal"));
-    });
-  });
-}
-renderPaymentMethods(defaultMethods);
-
-$("openBuyModal").addEventListener("click", () => $("buyModalOverlay").classList.remove("hidden"));
-$("openTransferModal").addEventListener("click", () => $("transferModalOverlay").classList.remove("h
