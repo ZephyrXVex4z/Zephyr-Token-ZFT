@@ -265,12 +265,8 @@
         <p class="form-hint">Esto no se conecta a PayPal real. Es solo una pantalla de ejemplo.</p>
       </div>
 
-      <div class="g-recaptcha-wrap">
-        <div class="g-recaptcha" data-sitekey="6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp" data-callback="onRecaptchaBuy"></div>
-      </div>
-
       <p class="form-error" id="buyError" role="alert"></p>
-      <button class="btn btn-primary btn-block" id="confirmBuyBtn" disabled>Simular compra</button>
+      <button class="btn btn-primary btn-block" id="confirmBuyBtn">Simular compra</button>
     </div>
   </div>
 </div>
@@ -287,13 +283,9 @@
     <label class="field-label">Cantidad (ZFT)</label>
     <input type="number" id="transferAmount" min="1" step="1">
 
-    <div class="g-recaptcha-wrap">
-      <div class="g-recaptcha" data-sitekey="6LegakgtAAAAAMU8YFsMc4UAAzr5-aHu5Zn1YFpp" data-callback="onRecaptchaTransfer"></div>
-    </div>
-
     <p class="form-error" id="transferError" role="alert"></p>
     <p class="form-success" id="transferSuccess" role="status"></p>
-    <button class="btn btn-primary btn-block" id="confirmTransferBtn" disabled>Enviar Zephyr</button>
+    <button class="btn btn-primary btn-block" id="confirmTransferBtn">Enviar Zephyr</button>
   </div>
 </div>
 
@@ -304,7 +296,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAW1dR6J24tGhaxlYfrfgPUFbqO5pLd8E0",
@@ -319,25 +311,17 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-window.addEventListener("error", (e) => console.error("ERROR JS:", e.message, e.lineno));
-window.addEventListener("unhandledrejection", (e) => console.error("ERROR PROMESA:", e.reason));
+const marker = document.createElement("div");
+marker.style.cssText = "position:fixed; bottom:0; left:0; right:0; max-height:40vh; overflow-y:auto; background:#111; color:#5FD79A; text-align:left; padding:14px; font-family:monospace; font-size:12px; z-index:99999; white-space:pre-wrap;";
+marker.textContent = "Zephyr cargando...\n";
+document.body.appendChild(marker);
+function log(msg) { marker.textContent += msg + "\n"; }
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n ?? 0).toLocaleString("es-ES");
 let currentUser = null;
 let currentProfile = null;
 let recaptchaOk = { register: false };
-
-function showAuthScreen() {
-  $("authScreen").classList.remove("hidden");
-  $("appShell").classList.add("hidden");
-}
-function showAppShell() {
-  $("authScreen").classList.add("hidden");
-  $("appShell").classList.remove("hidden");
-}
-
-window.onRecaptchaRegister = () => { recaptchaOk.register = true; $("registerSubmitBtn").disabled = false; };
 
 $("closeDisclaimer").addEventListener("click", () => $("disclaimerBanner").classList.add("hidden"));
 
@@ -354,38 +338,43 @@ $("tabRegister").addEventListener("click", () => {
   $("loginForm").classList.add("hidden");
 });
 
+window.onRecaptchaRegister = () => { recaptchaOk.register = true; $("registerSubmitBtn").disabled = false; };
+
 $("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  $("registerError").textContent = "";
-  if (!recaptchaOk.register) { $("registerError").textContent = "Completa el reCAPTCHA."; return; }
+  log("Submit de registro capturado.");
   const username = $("registerUsername").value.trim();
   const email = $("registerEmail").value.trim();
   const password = $("registerPassword").value;
   const usernameLower = username.toLowerCase();
   try {
     const usernameSnap = await getDoc(doc(db, "usernames", usernameLower));
-    if (usernameSnap.exists()) { $("registerError").textContent = "Ese nombre de usuario ya está en uso."; return; }
+    if (usernameSnap.exists()) { log("Usuario ya existe"); $("registerError").textContent = "Ese nombre de usuario ya está en uso."; return; }
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    try { await setDoc(doc(db, "usernames", usernameLower), { uid: cred.user.uid }); } catch (_) {}
+    await setDoc(doc(db, "usernames", usernameLower), { uid: cred.user.uid });
     await setDoc(doc(db, "users", cred.user.uid), {
       username, usernameLower, email, balance: 100, isAdmin: false, createdAt: serverTimestamp()
     });
     await addDoc(collection(db, "users", cred.user.uid, "transactions"), {
       type: "bonus", amount: 100, note: "Regalo de bienvenida", createdAt: serverTimestamp()
     });
+    log("Registro OK");
   } catch (err) {
+    log("ERROR registro: " + err.message);
     $("registerError").textContent = traduceErrorFirebase(err);
   }
 });
 
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  $("loginError").textContent = "";
+  log("Submit del login capturado.");
   const email = $("loginEmail").value.trim();
   const password = $("loginPassword").value;
   try {
     await signInWithEmailAndPassword(auth, email, password);
+    log("Login OK");
   } catch (err) {
+    log("ERROR login: " + err.message);
     $("loginError").textContent = traduceErrorFirebase(err);
   }
 });
@@ -401,15 +390,25 @@ function traduceErrorFirebase(err) {
   return "Ocurrió un error. Inténtalo de nuevo.";
 }
 
+function showAuthScreen() {
+  $("authScreen").classList.remove("hidden");
+  $("appShell").classList.add("hidden");
+}
+function showAppShell() {
+  $("authScreen").classList.add("hidden");
+  $("appShell").classList.remove("hidden");
+}
+
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
-  if (!user) { currentProfile = null; showAuthScreen(); return; }
+  if (!user) { log("Sin sesión."); showAuthScreen(); return; }
+  log("Sesión: " + user.email);
   showAppShell();
   onSnapshot(doc(db, "users", user.uid), (snap) => {
-    if (!snap.exists()) return;
+    if (!snap.exists()) { log("Doc no existe"); return; }
     currentProfile = snap.data();
     renderProfile();
-  }, (err) => console.error("ERROR firestore:", err));
+  }, (err) => log("ERROR firestore: " + err.message));
 
   const txQuery = query(collection(db, "users", user.uid, "transactions"), orderBy("createdAt", "desc"), limit(25));
   onSnapshot(txQuery, (snap) => renderLedger(snap.docs.map(d => d.data())));
@@ -421,25 +420,26 @@ function renderProfile() {
   $("headerUsername").textContent = currentProfile.username;
   $("balanceNumber").textContent = fmt(currentProfile.balance);
   $("navAdmin").classList.toggle("hidden", !currentProfile.isAdmin);
+  log("renderProfile OK. isAdmin=" + currentProfile.isAdmin);
 }
 
 function renderLedger(txs) {
   const list = $("ledgerList");
   if (!txs.length) {
-    list.innerHTML = `<p class="empty-state">Aún no tienes movimientos. Compra o recibe Zephyr para ver tu historial aquí.</p>`;
+    list.innerHTML = '<p class="empty-state">Aún no tienes movimientos. Compra o recibe Zephyr para ver tu historial aquí.</p>';
     return;
   }
   list.innerHTML = txs.map(tx => {
     const isIn = tx.amount >= 0;
     const label = {
       bonus: "Regalo de bienvenida",
-      buy: `Compra simulada (${tx.method || "método simulado"})`,
-      transfer_in: `Recibido de ${tx.from || "alguien"}`,
-      transfer_out: `Enviado a ${tx.to || "alguien"}`,
+      buy: "Compra simulada (" + (tx.method || "método simulado") + ")",
+      transfer_in: "Recibido de " + (tx.from || "alguien"),
+      transfer_out: "Enviado a " + (tx.to || "alguien"),
       admin_grant: "Otorgado por administración"
     }[tx.type] || tx.type;
-    const when = tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString("es-ES") : "…";
-    return `<div class="ledger-row"><span class="ledger-icon ${isIn ? "in" : "out"}">${isIn ? "↓" : "↑"}</span><div class="ledger-main"><div class="ledger-title">${label}</div><div class="ledger-meta">${when}</div></div><span class="ledger-amount ${isIn ? "in" : "out"}">${isIn ? "+" : ""}${fmt(tx.amount)} ZFT</span></div>`;
+    const when = tx.createdAt && tx.createdAt.toDate ? tx.createdAt.toDate().toLocaleString("es-ES") : "…";
+    return '<div class="ledger-row"><span class="ledger-icon ' + (isIn ? "in" : "out") + '">' + (isIn ? "↓" : "↑") + '</span><div class="ledger-main"><div class="ledger-title">' + label + '</div><div class="ledger-meta">' + when + '</div></div><span class="ledger-amount ' + (isIn ? "in" : "out") + '">' + (isIn ? "+" : "") + fmt(tx.amount) + ' ZFT</span></div>';
   }).join("");
 }
 
@@ -447,9 +447,4 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-    $("view-" + btn.dataset.view).classList.add("active");
-    btn.classList.add("active");
-  });
-});
-
-$("userMenuBtn").addEventLis2
+    $("view-" + btn.dataset.view).class
