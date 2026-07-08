@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba mínima</title>
+</head>
+<body style="font-family: sans-serif; text-align:center; padding:60px 20px; background:#14162B; color:white;">
+
+<h1 id="result" style="color:#F17389;">❌ Si ves esto en rojo, el JavaScript NO se está ejecutando</h1>
+
+<button id="testBtn" style="font-size:20px; padding:16px 32px; border-radius:12px; border:none; background:#3FBFB0; color:#0D0E1C; font-weight:bold;">
+  Toca aquí para probar
+</button>
+
+<p id="clickResult" style="margin-top:20px; font-size:18px;"></p>
+
+<script>
+  document.getElementById('result').textContent = '✅ El JavaScript básico SÍ se ejecuta';
+  document.getElementById('result').style.color = '#5FD79A';
+
+  document.getElementById('testBtn').addEventListener('click', function() {
+    document.getElementById('clickResult').textContent = '✅ El botón también funciona correctamente. Hora: ' + new Date().toLocaleTimeString();
+  });
+</script>
+
+</body>
+</html>
+
